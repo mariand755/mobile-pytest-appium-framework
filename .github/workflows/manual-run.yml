@@ -1,0 +1,42 @@
+name: Manual Run (Sauce)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "android or ios"
+        required: true
+        default: "android"
+      markers:
+        description: 'pytest -m expression'
+        required: true
+        default: 'smoke and sauce'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
+      SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
+      SAUCE_REGION: us-west-1
+      PLATFORM: ${{ inputs.platform }}
+      ANDROID_APP: ${{ secrets.ANDROID_APP }}
+      IOS_APP: ${{ secrets.IOS_APP }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker compose -f docker/compose.yml build
+
+      - name: Run Tests
+        run: |
+          docker compose -f docker/compose.yml run --rm tests \
+            pytest -m "${{ inputs.markers }}" -q
+
+      - name: Upload Allure Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: reports/allure-results

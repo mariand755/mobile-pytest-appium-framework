@@ -1,0 +1,10 @@
+services:
+  tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - ../.env
+    volumes:
+      - ../:/work
+    working_dir: /work

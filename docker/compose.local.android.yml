@@ -1,0 +1,35 @@
+services:
+  appium:
+    build:
+      context: ..
+      dockerfile: docker/appium/Dockerfile
+    environment:
+      HOST_ADB_TARGET: "host.docker.internal:5555"
+    ports:
+      - "4723:4723"
+    volumes:
+      # Mount apps so Appium can install local APK
+      - ../apps:/apps
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4723/wd/hub/status >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    depends_on:
+      appium:
+        condition: service_healthy
+    env_file:
+      - ../.env
+    environment:
+      PYTHONPATH: "/work"
+      APPIUM_SERVER_URL: "http://appium:4723/wd/hub"
+      PLATFORM: "android"
+      ANDROID_APP_PATH: "/apps/android/Android.SauceLabs.apk"
+    volumes:
+      - ../:/work
+    working_dir: /work

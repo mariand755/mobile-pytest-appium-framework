@@ -1,0 +1,33 @@
+name: PR - Smoke (Sauce)
+
+on:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
+      SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
+      SAUCE_REGION: us-west-1
+      PLATFORM: android
+      ANDROID_APP: ${{ secrets.ANDROID_APP }}
+      IOS_APP: ${{ secrets.IOS_APP }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker compose -f docker/compose.yml build
+
+      - name: Run Smoke
+        run: |
+          docker compose -f docker/compose.yml run --rm tests \
+            pytest -m "smoke and sauce and android" -q
+
+      - name: Upload Allure Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: reports/allure-results
