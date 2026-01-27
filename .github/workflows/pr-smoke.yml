@@ -1,33 +1,72 @@
-name: PR - Smoke (Sauce)
+name: PR Gate - Android Smoke (Docker)
 
 on:
   pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-smoke-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  smoke:
+  android-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     env:
       SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
       SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
-      SAUCE_REGION: us-west-1
-      PLATFORM: android
-      ANDROID_APP: ${{ secrets.ANDROID_APP }}
-      IOS_APP: ${{ secrets.IOS_APP }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker compose -f docker/compose.yml build
-
-      - name: Run Smoke
+      - name: Verify Sauce secrets
         run: |
-          docker compose -f docker/compose.yml run --rm tests \
-            pytest -m "smoke and sauce and android" -q
+          test -n "$SAUCE_USERNAME"
+          test -n "$SAUCE_ACCESS_KEY"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Prepare report dirs
+        run: |
+          mkdir -p reports/allure-results reports/artifacts
+
+      - name: Build images
+        run: |
+          docker compose -f docker/compose.yml build
+
+      - name: Run Smoke on Sauce (Android)
+        run: |
+          docker compose -f docker/compose.yml run --rm tests -- \
+            pytest -m "smoke and android" -q --alluredir=reports/allure-results
 
       - name: Upload Allure Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: allure-results
+          name: allure-results-${{ github.run_id }}
           path: reports/allure-results
+          if-no-files-found: ignore
+
+      - name: Upload Failure Artifacts (screenshots + xml)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-artifacts-${{ github.run_id }}
+          path: reports/artifacts
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker/compose.yml down -v --remove-orphans

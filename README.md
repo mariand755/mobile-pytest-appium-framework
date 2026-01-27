@@ -1,6 +1,8 @@
 # 📱 Mobile Test Automation Framework
 
-> A production-grade, Docker-first mobile test automation framework built with **Pytest** + **Appium**, designed for local development, cloud execution (Sauce Labs), and seamless CI/CD integration.
+> A Docker-first mobile test automation framework built with **Pytest** + **Appium**, 
+designed for local Android development and Sauce Labs execution with CI/CD support.
+
 
 This project demonstrates how modern mobile QE teams build scalable, portable, and CI-ready test platforms with **zero local dependencies** beyond Docker.
 
@@ -38,7 +40,10 @@ This project demonstrates how modern mobile QE teams build scalable, portable, a
 - **Appium 2 + UiAutomator2** – Running in a dedicated container
 - **Pytest runner** – Isolated in a separate container
 - **Android emulator** – Runs on the host, connected via ADB over TCP
-- **Smoke test** – Simple end-to-end validation of the setup
+- **Smoke test suite** – Login, invalid login, logout, add-to-cart
+- **Page Object Model** – Screens + reusable components
+- **Locator abstraction** – Platform-specific locator files
+- **UI helpers** – Safe clicks, waits, reusable finders
 
 ---
 
@@ -135,9 +140,15 @@ cp .env.example .env
 ├── scripts/                        # Helper utilities
 │   └── download_app.sh             # App download script
 ├── src/
-│   ├── conftest.py                 # Pytest fixtures
-│   ├── core/driver_factory.py      # Driver setup
-│   └── tests/smoke/                # Smoke tests
+├── conftest.py                     # Pytest fixtures
+├── core/
+│   └── driver_factory.py           # Driver setup
+├── page_objects/                   # Screen & component abstractions
+├── locators/                       # Platform-specific locators
+├── utils/                          # UI helpers (waits, safe clicks)
+└── tests/
+    └── smoke/                      # Smoke tests
+
 ├── pytest.ini                      # Pytest configuration
 ├── requirements.txt                # Python dependencies
 └── README.md                       # This file
@@ -146,6 +157,8 @@ cp .env.example .env
 ---
 
 ## 🔄 CI/CD Workflows
+The PR smoke workflow runs Android smoke tests against Sauce Labs 
+and blocks merges if failures occur.
 
 Workflows are located in `.github/workflows/`:
 
@@ -155,6 +168,6 @@ Workflows are located in `.github/workflows/`:
 ---
 
 ## 📝 Notes
-
+- Local Android execution uses a host emulator connected via ADB over TCP
 - **APK/IPA binaries** should stay local (repo uses `.gitkeep` in `apps/`)
 - **Allure reporting** is ready to wire (results directory lives under `reports/`)

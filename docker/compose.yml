@@ -5,6 +5,10 @@ services:
       dockerfile: docker/Dockerfile
     env_file:
       - ../.env
+    environment:
+      # Allow CI to pass secrets; falls back to .env locally
+      SAUCE_USERNAME: ${SAUCE_USERNAME}
+      SAUCE_ACCESS_KEY: ${SAUCE_ACCESS_KEY}
     volumes:
       - ../:/work
     working_dir: /work
