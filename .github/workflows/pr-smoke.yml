@@ -30,7 +30,7 @@ jobs:
           RUN_ENV=ci
           PLATFORM=android
           APPIUM_SERVER_URL=http://appium:4723/wd/hub
-          ANDROID_SAUCE_APP=sauce-storage:Android.SauceLabs.apk
+          ANDROID_SAUCE_APP=storage:filename=Android.SauceLabs.apk
           SAUCE_USERNAME=${{ secrets.SAUCE_USERNAME }}
           SAUCE_ACCESS_KEY=${{ secrets.SAUCE_ACCESS_KEY }}
           SAUCE_REGION=${{ secrets.SAUCE_REGION }}
