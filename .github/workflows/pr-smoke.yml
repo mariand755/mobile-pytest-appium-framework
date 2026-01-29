@@ -23,6 +23,7 @@ jobs:
           test -n "${{ secrets.SAUCE_USERNAME }}"
           test -n "${{ secrets.SAUCE_ACCESS_KEY }}"
           test -n "${{ secrets.SAUCE_REGION }}"
+          test -n "${{ secrets.SAUCE_APPIUM_URL }}"
 
       - name: Create .env for CI (from GitHub secrets)
         run: |
