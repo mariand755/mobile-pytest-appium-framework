@@ -15,8 +15,12 @@ jobs:
     timeout-minutes: 30
 
     env:
+      RUN_ENV: ci
+      PLATFORM: android
+      ANDROID_SAUCE_APP: sauce-storage:Android.SauceLabs.apk
       SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
       SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
+      SAUCE_REGION: ${{ secrets.SAUCE_REGION }}
 
     steps:
       - name: Checkout

@@ -1,6 +1,12 @@
 from appium import webdriver
 from appium.options.android import UiAutomator2Options
-from src.config.settings import APPIUM_SERVER_URL, ANDROID_APP_PATH
+from src.config.settings import (
+    RUN_ENV,
+    APPIUM_SERVER_URL,
+    ANDROID_LOCAL_APP_PATH,
+    ANDROID_SAUCE_APP,
+)
+
 
 def create_android_driver():
     opts = UiAutomator2Options()
@@ -8,11 +14,15 @@ def create_android_driver():
     opts.automation_name = "UiAutomator2"
     opts.device_name = "Android Emulator"
 
-    # ADB over TCP target
+    # ADB over TCP target (local docker only)
     opts.udid = "host.docker.internal:5555"
 
-    # App under test
-    opts.app = ANDROID_APP_PATH
+    #App selection (local vs sauce)
+    if RUN_ENV == "ci":
+        opts.app = ANDROID_SAUCE_APP
+    else:
+        opts.app = ANDROID_LOCAL_APP_PATH
+
 
     # App launch tuning (Sauce sample app)
     opts.app_package = "com.swaglabsmobileapp"

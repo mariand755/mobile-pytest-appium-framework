@@ -54,6 +54,19 @@ This project demonstrates how modern mobile QE teams build scalable, portable, a
 
 ---
 
+## 🧪 Local vs CI Execution
+
+This framework supports running tests both locally (Docker + local APK)
+and in CI (GitHub Actions + Sauce Labs).
+
+### Local (Docker + Emulator)
+- Uses a locally mounted APK
+- Default behavior when `RUN_ENV=local` (default)
+
+```bash
+docker compose -f docker/compose.local.android.yml run --rm tests \
+  pytest -m "smoke and android"
+
 ## 🚀 Quick Start
 
 ### Setup (Local Android)
@@ -117,12 +130,15 @@ cp .env.example .env
 
 | Variable | Description |
 |----------|-------------|
-| `APPIUM_SERVER_URL` | Defaults to Appium container |
-| `ANDROID_APP_PATH` | Path inside container; default uses `/work/...` |
-| `SAUCE_USERNAME` | Sauce Labs username (optional) |
-| `SAUCE_ACCESS_KEY` | Sauce Labs access key (optional) |
+| `RUN_ENV` | `local` or `ci` |
+| `APPIUM_SERVER_URL` | Appium server endpoint |
+| `ANDROID_LOCAL_APP_PATH` | Local APK path (Docker container) |
+| `ANDROID_SAUCE_APP` | Sauce Storage APK reference |
+| `SAUCE_USERNAME` | Sauce Labs username |
+| `SAUCE_ACCESS_KEY` | Sauce Labs access key |
 
 ---
+
 
 ## 📂 Project Structure
 
@@ -148,7 +164,6 @@ cp .env.example .env
 ├── utils/                          # UI helpers (waits, safe clicks)
 └── tests/
     └── smoke/                      # Smoke tests
-
 ├── pytest.ini                      # Pytest configuration
 ├── requirements.txt                # Python dependencies
 └── README.md                       # This file
@@ -157,8 +172,8 @@ cp .env.example .env
 ---
 
 ## 🔄 CI/CD Workflows
-The PR smoke workflow runs Android smoke tests against Sauce Labs 
-and blocks merges if failures occur.
+The PR smoke workflow runs Android smoke tests against Sauce Labs using the same Docker images
+as local execution, ensuring parity between local and CI environments.
 
 Workflows are located in `.github/workflows/`:
 
