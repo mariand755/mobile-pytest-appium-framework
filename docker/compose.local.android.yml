@@ -24,7 +24,7 @@ services:
       appium:
         condition: service_healthy
     env_file:
-      - ../.env
+      - ../.env.local
     environment:
       PYTHONPATH: "/work"
       APPIUM_SERVER_URL: "http://appium:4723/wd/hub"

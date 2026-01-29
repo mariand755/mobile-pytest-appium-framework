@@ -16,8 +16,11 @@ reports/
 
 # Environment variables
 .env
+.env.local
+.env.ci
 .env.*
 !.env.example
+
 
 # App binaries
 apps/android/*.apk

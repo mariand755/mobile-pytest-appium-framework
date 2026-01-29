@@ -23,18 +23,20 @@ jobs:
           test -n "${{ secrets.SAUCE_USERNAME }}"
           test -n "${{ secrets.SAUCE_ACCESS_KEY }}"
           test -n "${{ secrets.SAUCE_REGION }}"
-          test -n "${{ secrets.SAUCE_APPIUM_URL }}"
+          
 
       - name: Create .env for CI (from GitHub secrets)
         run: |
           printf "%s\n" \
             "RUN_ENV=ci" \
             "PLATFORM=android" \
-            "APPIUM_SERVER_URL=${{ secrets.SAUCE_APPIUM_URL }}" \
-            "ANDROID_SAUCE_APP=storage:filename=Android.SauceLabs.apk" \
             "SAUCE_USERNAME=${{ secrets.SAUCE_USERNAME }}" \
             "SAUCE_ACCESS_KEY=${{ secrets.SAUCE_ACCESS_KEY }}" \
             "SAUCE_REGION=${{ secrets.SAUCE_REGION }}" \
+            "APPIUM_SERVER_URL=https://${{ secrets.SAUCE_USERNAME }}:${{ secrets.SAUCE_ACCESS_KEY }}@ondemand.${{ secrets.SAUCE_REGION }}.saucelabs.com:443/wd/hub" \
+            "ANDROID_SAUCE_APP=storage:filename=Android.SauceLabs.apk" \
+            "SAUCE_ANDROID_DEVICE=Samsung Galaxy S9 Plus FHD GoogleAPI Emulator" \
+            "SAUCE_ANDROID_PLATFORM_VERSION=8.1" \
             > .env
 
           echo "==== .env keys (redacted) ===="
