@@ -13,14 +13,15 @@ def create_android_driver():
     opts.platform_name = "Android"
     opts.automation_name = "UiAutomator2"
     opts.device_name = "Android Emulator"
-
-    # ADB over TCP target (local docker only)
-    opts.udid = "host.docker.internal:5555"
+   
 
     #App selection (local vs sauce)
     if RUN_ENV == "ci":
+        # Sauce provides the device; do NOT set a local udid
         opts.app = ANDROID_SAUCE_APP
     else:
+        # ADB over TCP target (local docker only)
+        opts.udid = "host.docker.internal:5555"
         opts.app = ANDROID_LOCAL_APP_PATH
 
 

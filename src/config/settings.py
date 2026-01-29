@@ -30,5 +30,5 @@ ANDROID_LOCAL_APP_PATH = os.getenv(
 
 ANDROID_SAUCE_APP = os.getenv(
     "ANDROID_SAUCE_APP",
-    "sauce-storage:Android.SauceLabs.apk"
+    "storage:filename=Android.SauceLabs.apk"
 )

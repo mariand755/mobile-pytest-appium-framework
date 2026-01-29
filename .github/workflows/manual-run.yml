@@ -16,15 +16,21 @@ jobs:
   run:
     runs-on: ubuntu-latest
     env:
+      RUN_ENV: ci
+      APPIUM_SERVER_URL: ${{ secrets.SAUCE_APPIUM_URL }}
       SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
       SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
-      SAUCE_REGION: us-west-1
+      SAUCE_REGION: ${{ secrets.SAUCE_REGION }}
       PLATFORM: ${{ inputs.platform }}
-      ANDROID_APP: ${{ secrets.ANDROID_APP }}
-      IOS_APP: ${{ secrets.IOS_APP }}
+      ANDROID_SAUCE_APP: ${{ secrets.ANDROID_SAUCE_APP }}
+      IOS_SAUCE_APP: ${{ secrets.IOS_SAUCE_APP }}
 
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Prepare report dirs
+        run: |
+          mkdir -p reports/allure-results reports/artifacts
 
       - name: Build Docker image
         run: docker compose -f docker/compose.yml build
@@ -40,3 +46,13 @@ jobs:
         with:
           name: allure-results
           path: reports/allure-results
+          if-no-files-found: ignore
+
+
+      - name: Upload Failure Artifacts (screenshots + xml)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-artifacts-${{ github.run_id }}
+          path: reports/artifacts
+          if-no-files-found: ignore

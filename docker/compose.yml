@@ -6,9 +6,11 @@ services:
     env_file:
       - ../.env
     environment:
+      PYTHONPATH: /work
       # Allow CI to pass secrets; falls back to .env locally
       SAUCE_USERNAME: ${SAUCE_USERNAME}
       SAUCE_ACCESS_KEY: ${SAUCE_ACCESS_KEY}
+      SAUCE_REGION: ${SAUCE_REGION}
     volumes:
       - ../:/work
     working_dir: /work
