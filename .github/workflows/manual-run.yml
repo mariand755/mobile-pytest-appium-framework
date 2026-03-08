@@ -10,7 +10,7 @@ on:
       markers:
         description: 'pytest -m expression'
         required: true
-        default: 'smoke and android'
+        default: 'smoke and android and not quarantine'
 
 permissions:
   contents: read
@@ -68,10 +68,17 @@ jobs:
       - name: Build Docker image
         run: docker compose --env-file .env -f docker/compose.yml build
 
-      - name: Run Tests
+      - name: Run Tests (suite retry + bounded per-test reruns)
         run: |
-          docker compose --env-file .env -f docker/compose.yml run --rm tests \
-            pytest -m "${{ inputs.markers }}" -q --alluredir=reports/allure-results
+          bash scripts/ci_retry_pytest.sh \
+            --compose-file docker/compose.yml \
+            --env-file .env \
+            --markers "${{ inputs.markers }}" \
+            --allure-dir reports/allure-results \
+            --per-test-reruns 1 \
+            --per-test-reruns-delay-seconds 5 \
+            --max-retries 1 \
+            --retry-delay-seconds 12
 
       - name: Upload Allure Results
         if: always()

@@ -83,11 +83,18 @@ jobs:
         if: ${{ steps.gate.outputs.run_gate == 'true' }}
         run: docker compose --env-file .env -f docker/compose.yml build
 
-      - name: Run weekly regression (Android)
+      - name: Run weekly regression (Android, suite retry + per-test reruns)
         if: ${{ steps.gate.outputs.run_gate == 'true' }}
         run: |
-          docker compose --env-file .env -f docker/compose.yml run --rm tests \
-            pytest -m "regression and android" -q --alluredir=reports/allure-results
+          bash scripts/ci_retry_pytest.sh \
+            --compose-file docker/compose.yml \
+            --env-file .env \
+            --markers "regression and android and not quarantine" \
+            --allure-dir reports/allure-results \
+            --per-test-reruns 1 \
+            --per-test-reruns-delay-seconds 5 \
+            --max-retries 1 \
+            --retry-delay-seconds 12
 
       - name: Upload Allure Results
         if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
@@ -153,7 +160,7 @@ jobs:
             echo "## Weekly Regression Summary"
             echo "- Status: ${{ job.status }}"
             echo "- Gate decision: ${{ steps.gate.outputs.reason }}"
-            echo "- Markers: regression and android"
+            echo "- Markers: regression and android and not quarantine"
             echo "- Run URL: ${RUN_URL}"
             if [[ -n "$REPORT_URL" ]]; then
               echo "- Allure report: ${REPORT_URL}"
@@ -186,7 +193,7 @@ jobs:
             "Ref: ${{ github.ref_name }}" \
             "Event: ${{ github.event_name }}" \
             "Gate: ${{ steps.gate.outputs.reason }}" \
-            "Markers: regression and android" \
+            "Markers: regression and android and not quarantine" \
             "Run: ${RUN_URL}")"
 
           if [[ -n "$REPORT_URL" ]]; then

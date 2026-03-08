@@ -42,7 +42,7 @@ For local Android runs, you still need a running emulator and `adb` access on th
 - **Pytest runner** – Isolated in a separate container
 - **Android emulator** – Runs on the host, connected via ADB over TCP
 - **Feature-based test suites** – Auth, catalog, navigation, and journey flows
-- **Marker-driven execution** – `smoke`, `regression`, `e2e`, plus platform markers
+- **Marker-driven execution** – `smoke`, `regression`, `e2e`, plus platform/quarantine markers
 - **Page Object Model** – Screens + reusable components
 - **Locator abstraction** – Platform-specific locator files
 - **Data-driven coverage** – JSON and CSV test data inputs
@@ -125,6 +125,7 @@ Markers are defined in `pytest.ini`:
 | `android` | Android-targeted tests |
 | `ios` | iOS-targeted tests |
 | `sauce` | Tests intended for Sauce Labs execution |
+| `quarantine` | Temporarily isolated flaky tests excluded from default CI marker expressions |
 
 ---
 
@@ -181,6 +182,7 @@ cp .env.example .env.local
 │   ├── allure-results/
 │   └── artifacts/
 ├── scripts/                        # Helper utilities
+│   ├── ci_retry_pytest.sh          # Suite-level transient retry wrapper (+ optional per-test reruns)
 │   └── download_app.sh             # App download script
 ├── src/
 │   ├── config/
@@ -219,9 +221,9 @@ The workflows run tests in Docker and upload Allure/failure artifacts.
 Workflows are located in `.github/workflows/`:
 
 - **`pr-mobile-gate.yml`** – Pull request mobile gate on `main` (currently runs Android smoke checks in Sauce)
-- **`manual-run.yml`** – Manual Sauce run with selectable `platform` and marker expression
-- **`weekly-regression.yml`** – Scheduled + manual Android regression run (`pytest -m "regression and android"`)
-- **`pre-release-full-run.yml`** – Manual Android pre-release run (`pytest -m "(smoke or regression or e2e) and android"`)
+- **`manual-run.yml`** – Manual Sauce run with selectable `platform` and marker expression (default excludes `quarantine`)
+- **`weekly-regression.yml`** – Scheduled + manual Android regression run (`pytest -m "regression and android and not quarantine"`)
+- **`pre-release-full-run.yml`** – Manual Android pre-release run (`pytest -m "(smoke or regression or e2e) and android and not quarantine"`)
 
 ---
 
@@ -229,3 +231,5 @@ Workflows are located in `.github/workflows/`:
 - Local Android execution uses a host emulator connected via ADB over TCP
 - **APK/IPA binaries** should stay local (repo uses `.gitkeep` in `apps/`)
 - **Allure reporting** is ready to wire (results directory lives under `reports/`)
+- CI uses a hybrid reliability strategy: suite-level bounded retry for transient infra and bounded per-test reruns for selected workflows
+- Default CI marker expressions exclude `quarantine`; run quarantined tests only through explicit marker input

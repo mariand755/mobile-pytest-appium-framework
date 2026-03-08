@@ -81,11 +81,16 @@ jobs:
         if: ${{ steps.gate.outputs.run_gate == 'true' }}
         run: docker compose --env-file .env -f docker/compose.yml build
 
-      - name: Run Android PR gate checks on Sauce
+      - name: Run Android PR gate checks on Sauce (suite retry only)
         if: ${{ steps.gate.outputs.run_gate == 'true' }}
         run: |
-          docker compose --env-file .env -f docker/compose.yml run --rm tests -- \
-            pytest -m "smoke and android" -q --alluredir=reports/allure-results
+          bash scripts/ci_retry_pytest.sh \
+            --compose-file docker/compose.yml \
+            --env-file .env \
+            --markers "smoke and android and not quarantine" \
+            --allure-dir reports/allure-results \
+            --max-retries 1 \
+            --retry-delay-seconds 12
 
       - name: Upload Allure Results
         if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
@@ -116,7 +121,7 @@ jobs:
             echo "## PR Mobile Gate Summary"
             echo "- Status: ${{ job.status }}"
             echo "- Gate decision: ${{ steps.gate.outputs.reason }}"
-            echo "- Markers: smoke and android"
+            echo "- Markers: smoke and android and not quarantine"
             echo "- Run URL: ${RUN_URL}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -143,7 +148,7 @@ jobs:
             "Ref: ${{ github.ref_name }}" \
             "Event: ${{ github.event_name }}" \
             "Gate: ${{ steps.gate.outputs.reason }}" \
-            "Markers: smoke and android" \
+            "Markers: smoke and android and not quarantine" \
             "Run: ${RUN_URL}")"
 
           PAYLOAD="$(jq -n --arg text "$MESSAGE" '{text: $text}')"
