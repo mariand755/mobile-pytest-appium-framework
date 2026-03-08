@@ -18,3 +18,10 @@ class MenuComponent:
             return True
         except Exception:
             return False
+
+    def menu_button_visible(self, timeout: int = 10) -> bool:
+        try:
+            wait_for(self.driver, MenuLocators.MENU_BTN, timeout=timeout)
+            return True
+        except Exception:
+            return False

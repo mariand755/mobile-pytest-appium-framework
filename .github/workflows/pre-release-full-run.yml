@@ -1,0 +1,107 @@
+name: Pre-release Android Full Suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      markers:
+        description: 'pytest -m expression'
+        required: true
+        default: '(smoke or regression or e2e) and android'
+
+concurrency:
+  group: pre-release-android-full-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Temporary safety switch while Sauce credentials are unavailable/expired.
+  # Set to "true" after credentials are rotated and validated.
+  ENABLE_PRE_RELEASE_ANDROID_FULL: "false"
+
+jobs:
+  pre-release-android:
+    name: Pre-release Android Full Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Decide pre-release workflow execution
+        id: gate
+        env:
+          SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
+          SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
+          SAUCE_REGION: ${{ secrets.SAUCE_REGION }}
+        run: |
+          if [[ "${{ env.ENABLE_PRE_RELEASE_ANDROID_FULL }}" != "true" ]]; then
+            echo "run_gate=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Skipped: set ENABLE_PRE_RELEASE_ANDROID_FULL=true to enable this workflow." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ -z "$SAUCE_USERNAME" || -z "$SAUCE_ACCESS_KEY" || -z "$SAUCE_REGION" ]]; then
+            echo "run_gate=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Skipped: one or more Sauce secrets are missing." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "run_gate=true" >> "$GITHUB_OUTPUT"
+          echo "reason=Enabled: pre-release Android suite will run." >> "$GITHUB_OUTPUT"
+
+      - name: Gate status
+        run: echo "${{ steps.gate.outputs.reason }}"
+
+      - name: Create .env for CI (from GitHub secrets)
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
+        run: |
+          printf "%s\n" \
+            "RUN_ENV=ci" \
+            "PLATFORM=android" \
+            "SAUCE_USERNAME=${{ secrets.SAUCE_USERNAME }}" \
+            "SAUCE_ACCESS_KEY=${{ secrets.SAUCE_ACCESS_KEY }}" \
+            "SAUCE_REGION=${{ secrets.SAUCE_REGION }}" \
+            "APPIUM_SERVER_URL=https://ondemand.${{ secrets.SAUCE_REGION }}.saucelabs.com:443/wd/hub" \
+            "ANDROID_SAUCE_APP=storage:filename=Android.SauceLabs.apk" \
+            "IOS_SAUCE_APP=storage:filename=iOS.Simulator.SauceLabs.zip" \
+            "SAUCE_ANDROID_DEVICE=Samsung Galaxy S9 Plus FHD GoogleAPI Emulator" \
+            "SAUCE_ANDROID_PLATFORM_VERSION=8.1" \
+            > .env
+
+          echo "==== .env keys (redacted) ===="
+          sed -E 's/(SAUCE_ACCESS_KEY=).+/\1***REDACTED***/' .env
+
+      - name: Prepare report dirs
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
+        run: |
+          mkdir -p reports/allure-results reports/artifacts
+
+      - name: Build Docker image
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
+        run: docker compose --env-file .env -f docker/compose.yml build
+
+      - name: Run pre-release suite (Android)
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
+        run: |
+          docker compose --env-file .env -f docker/compose.yml run --rm tests \
+            pytest -m "${{ inputs.markers }}" -q --alluredir=reports/allure-results
+
+      - name: Upload Allure Results
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-release-allure-${{ github.run_id }}
+          path: reports/allure-results
+          if-no-files-found: ignore
+
+      - name: Upload Failure Artifacts (screenshots + xml)
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-release-failure-artifacts-${{ github.run_id }}
+          path: reports/artifacts
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
+        run: docker compose --env-file .env -f docker/compose.yml down -v --remove-orphans

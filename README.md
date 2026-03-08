@@ -165,7 +165,9 @@ cp .env.example .env.local
 .
 ├── .github/workflows/              # CI workflows
 │   ├── manual-run.yml
-│   └── pr-mobile-gate.yml
+│   ├── pre-release-full-run.yml
+│   ├── pr-mobile-gate.yml
+│   └── weekly-regression.yml
 ├── apps/                           # App binaries (ignored; keep local)
 │   ├── android/
 │   └── ios/
@@ -218,6 +220,8 @@ Workflows are located in `.github/workflows/`:
 
 - **`pr-mobile-gate.yml`** – Pull request mobile gate on `main` (currently runs Android smoke checks in Sauce)
 - **`manual-run.yml`** – Manual Sauce run with selectable `platform` and marker expression
+- **`weekly-regression.yml`** – Scheduled + manual Android regression run (`pytest -m "regression and android"`)
+- **`pre-release-full-run.yml`** – Manual Android pre-release run (`pytest -m "(smoke or regression or e2e) and android"`)
 
 ---
 

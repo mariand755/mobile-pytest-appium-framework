@@ -36,3 +36,26 @@ class ProductsPage:
             return True
         except Exception:
             return False
+
+    def sort_button_visible(self, timeout: int = 10) -> bool:
+        try:
+            wait_for(self.driver, ProductsLocators.SORT_BUTTON, timeout=timeout)
+            return True
+        except Exception:
+            return False
+
+    def item_titles(self) -> list[str]:
+        by, value = ProductsLocators.ITEM_TITLE
+        elements = self.driver.find_elements(by, value)
+        return [el.text.strip() for el in elements if el.text and el.text.strip()]
+
+    def item_prices(self) -> list[float]:
+        by, value = ProductsLocators.ITEM_PRICE
+        elements = self.driver.find_elements(by, value)
+        prices: list[float] = []
+        for el in elements:
+            raw = (el.text or "").strip().replace("$", "")
+            if not raw:
+                continue
+            prices.append(float(raw))
+        return prices
