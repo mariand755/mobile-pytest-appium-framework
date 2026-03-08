@@ -12,6 +12,11 @@ on:
         required: true
         default: 'smoke and android'
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -57,6 +62,7 @@ jobs:
       
       - name: Prepare report dirs
         run: |
+          rm -rf reports/allure-results reports/artifacts reports/allure-report
           mkdir -p reports/allure-results reports/artifacts
 
       - name: Build Docker image
@@ -84,6 +90,86 @@ jobs:
           path: reports/artifacts
           if-no-files-found: ignore
 
+      - name: Setup Java (for Allure CLI)
+        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Allure CLI
+        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        run: |
+          curl -fsSL -o allure.tgz https://github.com/allure-framework/allure2/releases/download/2.32.0/allure-2.32.0.tgz
+          tar -xzf allure.tgz
+          sudo mv allure-2.32.0 /opt/allure
+          echo "/opt/allure/bin" >> "$GITHUB_PATH"
+
+      - name: Build Allure HTML
+        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        run: allure generate reports/allure-results --clean -o reports/allure-report
+
+      - name: Setup Pages
+        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: reports/allure-report
+
+      - name: Deploy to GitHub Pages
+        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        id: deployment
+        uses: actions/deploy-pages@v4
+
       - name: Cleanup
         if: always()
         run: docker compose --env-file .env -f docker/compose.yml down -v --remove-orphans
+
+      - name: Write workflow summary
+        if: always()
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          REPORT_URL="${{ steps.deployment.outputs.page_url }}"
+
+          {
+            echo "## Manual Run Summary"
+            echo "- Status: `${{ job.status }}`"
+            echo "- Platform: `${{ inputs.platform }}`"
+            echo "- Markers: `${{ inputs.markers }}`"
+            echo "- Run URL: ${RUN_URL}"
+            if [[ -n "$REPORT_URL" ]]; then
+              echo "- Allure report: ${REPORT_URL}"
+            else
+              echo "- Allure report: not published (no Allure results generated)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack
+        if: ${{ always() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+          REPORT_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          if [[ -z "$SLACK_WEBHOOK_URL" ]]; then
+            echo "SLACK_WEBHOOK_URL is not configured; skipping Slack notification."
+            exit 0
+          fi
+
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ICON=":white_check_mark:"
+          if [[ "$JOB_STATUS" != "success" ]]; then
+            ICON=":x:"
+          fi
+
+          MESSAGE="${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*\nRepo: `${{ github.repository }}`\nRef: `${{ github.ref_name }}`\nEvent: `${{ github.event_name }}`\nPlatform: `${{ inputs.platform }}`\nMarkers: `${{ inputs.markers }}`\nRun: ${RUN_URL}"
+
+          if [[ -n "$REPORT_URL" ]]; then
+            MESSAGE="${MESSAGE}\nAllure: ${REPORT_URL}"
+          fi
+
+          PAYLOAD="$(jq -n --arg text "$MESSAGE" '{text: $text}')"
+          curl -fsSL -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"

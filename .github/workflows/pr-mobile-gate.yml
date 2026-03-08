@@ -70,6 +70,7 @@ jobs:
       - name: Prepare report dirs
         if: ${{ steps.gate.outputs.run_gate == 'true' }}
         run: |
+          rm -rf reports/allure-results reports/artifacts reports/allure-report
           mkdir -p reports/allure-results reports/artifacts
 
       - name: Set up Docker Buildx
@@ -105,3 +106,38 @@ jobs:
       - name: Cleanup
         if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
         run: docker compose --env-file .env -f docker/compose.yml down -v --remove-orphans
+
+      - name: Write workflow summary
+        if: ${{ always() }}
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          {
+            echo "## PR Mobile Gate Summary"
+            echo "- Status: `${{ job.status }}`"
+            echo "- Gate decision: `${{ steps.gate.outputs.reason }}`"
+            echo "- Markers: `smoke and android`"
+            echo "- Run URL: ${RUN_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack
+        if: ${{ always() && (github.event_name != 'pull_request' || job.status != 'success') }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [[ -z "$SLACK_WEBHOOK_URL" ]]; then
+            echo "SLACK_WEBHOOK_URL is not configured; skipping Slack notification."
+            exit 0
+          fi
+
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ICON=":white_check_mark:"
+          if [[ "$JOB_STATUS" != "success" ]]; then
+            ICON=":x:"
+          fi
+
+          MESSAGE="${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*\nRepo: `${{ github.repository }}`\nRef: `${{ github.ref_name }}`\nEvent: `${{ github.event_name }}`\nGate: `${{ steps.gate.outputs.reason }}`\nMarkers: `smoke and android`\nRun: ${RUN_URL}"
+
+          PAYLOAD="$(jq -n --arg text "$MESSAGE" '{text: $text}')"
+          curl -fsSL -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
