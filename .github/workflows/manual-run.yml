@@ -165,10 +165,17 @@ jobs:
             ICON=":x:"
           fi
 
-          MESSAGE="${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*\nRepo: ${{ github.repository }}\nRef: ${{ github.ref_name }}\nEvent: ${{ github.event_name }}\nPlatform: ${{ inputs.platform }}\nMarkers: ${{ inputs.markers }}\nRun: ${RUN_URL}"
+          MESSAGE="$(printf '%s\n' \
+            "${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*" \
+            "Repository: ${{ github.repository }}" \
+            "Ref: ${{ github.ref_name }}" \
+            "Event: ${{ github.event_name }}" \
+            "Platform: ${{ inputs.platform }}" \
+            "Markers: ${{ inputs.markers }}" \
+            "Run: ${RUN_URL}")"
 
           if [[ -n "$REPORT_URL" ]]; then
-            MESSAGE="${MESSAGE}\nAllure: ${REPORT_URL}"
+            MESSAGE="$(printf '%s\n%s' "$MESSAGE" "Allure: ${REPORT_URL}")"
           fi
 
           PAYLOAD="$(jq -n --arg text "$MESSAGE" '{text: $text}')"

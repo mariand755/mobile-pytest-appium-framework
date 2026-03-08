@@ -137,7 +137,14 @@ jobs:
             ICON=":x:"
           fi
 
-          MESSAGE="${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*\nRepo: ${{ github.repository }}\nRef: ${{ github.ref_name }}\nEvent: ${{ github.event_name }}\nGate: ${{ steps.gate.outputs.reason }}\nMarkers: smoke and android\nRun: ${RUN_URL}"
+          MESSAGE="$(printf '%s\n' \
+            "${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*" \
+            "Repository: ${{ github.repository }}" \
+            "Ref: ${{ github.ref_name }}" \
+            "Event: ${{ github.event_name }}" \
+            "Gate: ${{ steps.gate.outputs.reason }}" \
+            "Markers: smoke and android" \
+            "Run: ${RUN_URL}")"
 
           PAYLOAD="$(jq -n --arg text "$MESSAGE" '{text: $text}')"
           curl -fsSL -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
