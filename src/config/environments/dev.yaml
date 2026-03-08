@@ -1,0 +1,5 @@
+name: dev
+run_env: local
+platform: android
+appium_server_url: http://appium:4723/wd/hub
+notes: Local Android emulator execution via Docker Appium service.

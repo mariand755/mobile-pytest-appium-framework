@@ -1,16 +1,18 @@
-name: Manual Run (Sauce)
+name: Weekly Android Regression
 
 on:
+  schedule:
+    - cron: "0 2 * * 1"
   workflow_dispatch:
-    inputs:
-      platform:
-        description: "android or ios"
-        required: true
-        default: "android"
-      markers:
-        description: 'pytest -m expression'
-        required: true
-        default: 'smoke and android and not quarantine'
+
+concurrency:
+  group: weekly-android-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Temporary safety switch while Sauce credentials are unavailable/expired.
+  # Set to "true" after credentials are rotated and validated.
+  ENABLE_WEEKLY_ANDROID_REGRESSION: "false"
 
 permissions:
   contents: read
@@ -18,35 +20,46 @@ permissions:
   id-token: write
 
 jobs:
-  run:
+  weekly-regression:
+    name: Weekly Android Regression
     runs-on: ubuntu-latest
-    env:
-      RUN_ENV: ci
-      SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
-      SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
-      SAUCE_REGION: ${{ secrets.SAUCE_REGION }}
-      PLATFORM: ${{ inputs.platform }}
-      APPIUM_SERVER_URL: https://ondemand.${{ secrets.SAUCE_REGION }}.saucelabs.com:443/wd/hub
-      ANDROID_SAUCE_APP: storage:filename=Android.SauceLabs.apk
-      IOS_SAUCE_APP: storage:filename=iOS.Simulator.SauceLabs.zip
-      SAUCE_ANDROID_DEVICE: Samsung Galaxy S9 Plus FHD GoogleAPI Emulator
-      SAUCE_ANDROID_PLATFORM_VERSION: "8.1"
-
+    timeout-minutes: 40
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Verify Sauce secrets
+      - name: Decide weekly regression execution
+        id: gate
+        env:
+          SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
+          SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
+          SAUCE_REGION: ${{ secrets.SAUCE_REGION }}
         run: |
-          test -n "${{ secrets.SAUCE_USERNAME }}"
-          test -n "${{ secrets.SAUCE_ACCESS_KEY }}"
-          test -n "${{ secrets.SAUCE_REGION }}"
+          if [[ "${{ env.ENABLE_WEEKLY_ANDROID_REGRESSION }}" != "true" ]]; then
+            echo "run_gate=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Skipped: set ENABLE_WEEKLY_ANDROID_REGRESSION=true to enable this workflow." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-      - name: Create .env for CI (from GitHub secrets and inputs)
+          if [[ -z "$SAUCE_USERNAME" || -z "$SAUCE_ACCESS_KEY" || -z "$SAUCE_REGION" ]]; then
+            echo "run_gate=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Skipped: one or more Sauce secrets are missing." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "run_gate=true" >> "$GITHUB_OUTPUT"
+          echo "reason=Enabled: weekly Android regression will run." >> "$GITHUB_OUTPUT"
+
+      - name: Gate status
+        run: echo "${{ steps.gate.outputs.reason }}"
+
+      - name: Create .env for CI (from GitHub secrets)
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
         run: |
           printf "%s\n" \
             "RUN_ENV=ci" \
-            "PLATFORM=${{ inputs.platform }}" \
+            "PLATFORM=android" \
             "SAUCE_USERNAME=${{ secrets.SAUCE_USERNAME }}" \
             "SAUCE_ACCESS_KEY=${{ secrets.SAUCE_ACCESS_KEY }}" \
             "SAUCE_REGION=${{ secrets.SAUCE_REGION }}" \
@@ -59,21 +72,24 @@ jobs:
 
           echo "==== .env keys (redacted) ===="
           sed -E 's/(SAUCE_ACCESS_KEY=).+/\1***REDACTED***/' .env
-      
+
       - name: Prepare report dirs
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
         run: |
           rm -rf reports/allure-results reports/artifacts reports/allure-report
           mkdir -p reports/allure-results reports/artifacts
 
       - name: Build Docker image
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
         run: docker compose --env-file .env -f docker/compose.yml build
 
-      - name: Run Tests (suite retry + bounded per-test reruns)
+      - name: Run weekly regression (Android, suite retry + per-test reruns)
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
         run: |
           bash scripts/ci_retry_pytest.sh \
             --compose-file docker/compose.yml \
             --env-file .env \
-            --markers "${{ inputs.markers }}" \
+            --markers "regression and android and not quarantine" \
             --allure-dir reports/allure-results \
             --per-test-reruns 1 \
             --per-test-reruns-delay-seconds 5 \
@@ -81,31 +97,30 @@ jobs:
             --retry-delay-seconds 12
 
       - name: Upload Allure Results
-        if: always()
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: allure-results
+          name: weekly-regression-allure-${{ github.run_id }}
           path: reports/allure-results
           if-no-files-found: ignore
 
-
       - name: Upload Failure Artifacts (screenshots + xml)
-        if: always()
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: failure-artifacts-${{ github.run_id }}
+          name: weekly-regression-failure-artifacts-${{ github.run_id }}
           path: reports/artifacts
           if-no-files-found: ignore
 
       - name: Setup Java (for Allure CLI)
-        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' && hashFiles('reports/allure-results/*') != '' }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Install Allure CLI
-        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' && hashFiles('reports/allure-results/*') != '' }}
         run: |
           curl -fsSL -o allure.tgz https://github.com/allure-framework/allure2/releases/download/2.32.0/allure-2.32.0.tgz
           tar -xzf allure.tgz
@@ -113,44 +128,44 @@ jobs:
           echo "/opt/allure/bin" >> "$GITHUB_PATH"
 
       - name: Build Allure HTML
-        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' && hashFiles('reports/allure-results/*') != '' }}
         run: allure generate reports/allure-results --clean -o reports/allure-report
 
       - name: Setup Pages
-        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' && hashFiles('reports/allure-results/*') != '' }}
         uses: actions/configure-pages@v5
 
       - name: Upload Pages Artifact
-        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' && hashFiles('reports/allure-results/*') != '' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: reports/allure-report
 
       - name: Deploy to GitHub Pages
-        if: ${{ always() && hashFiles('reports/allure-results/*') != '' }}
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' && hashFiles('reports/allure-results/*') != '' }}
         id: deployment
         uses: actions/deploy-pages@v4
 
       - name: Cleanup
-        if: always()
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
         run: docker compose --env-file .env -f docker/compose.yml down -v --remove-orphans
 
       - name: Write workflow summary
-        if: always()
+        if: ${{ always() }}
         run: |
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           REPORT_URL="${{ steps.deployment.outputs.page_url }}"
 
           {
-            echo "## Manual Run Summary"
+            echo "## Weekly Regression Summary"
             echo "- Status: ${{ job.status }}"
-            echo "- Platform: ${{ inputs.platform }}"
-            echo "- Markers: ${{ inputs.markers }}"
+            echo "- Gate decision: ${{ steps.gate.outputs.reason }}"
+            echo "- Markers: regression and android and not quarantine"
             echo "- Run URL: ${RUN_URL}"
             if [[ -n "$REPORT_URL" ]]; then
               echo "- Allure report: ${REPORT_URL}"
             else
-              echo "- Allure report: not published (no Allure results generated)."
+              echo "- Allure report: not published (gated or no Allure results generated)."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -177,8 +192,8 @@ jobs:
             "Repository: ${{ github.repository }}" \
             "Ref: ${{ github.ref_name }}" \
             "Event: ${{ github.event_name }}" \
-            "Platform: ${{ inputs.platform }}" \
-            "Markers: ${{ inputs.markers }}" \
+            "Gate: ${{ steps.gate.outputs.reason }}" \
+            "Markers: regression and android and not quarantine" \
             "Run: ${RUN_URL}")"
 
           if [[ -n "$REPORT_URL" ]]; then
