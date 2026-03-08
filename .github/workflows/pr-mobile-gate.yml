@@ -114,9 +114,9 @@ jobs:
 
           {
             echo "## PR Mobile Gate Summary"
-            echo "- Status: `${{ job.status }}`"
-            echo "- Gate decision: `${{ steps.gate.outputs.reason }}`"
-            echo "- Markers: `smoke and android`"
+            echo "- Status: ${{ job.status }}"
+            echo "- Gate decision: ${{ steps.gate.outputs.reason }}"
+            echo "- Markers: smoke and android"
             echo "- Run URL: ${RUN_URL}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -137,7 +137,7 @@ jobs:
             ICON=":x:"
           fi
 
-          MESSAGE="${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*\nRepo: `${{ github.repository }}`\nRef: `${{ github.ref_name }}`\nEvent: `${{ github.event_name }}`\nGate: `${{ steps.gate.outputs.reason }}`\nMarkers: `smoke and android`\nRun: ${RUN_URL}"
+          MESSAGE="${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*\nRepo: ${{ github.repository }}\nRef: ${{ github.ref_name }}\nEvent: ${{ github.event_name }}\nGate: ${{ steps.gate.outputs.reason }}\nMarkers: smoke and android\nRun: ${RUN_URL}"
 
           PAYLOAD="$(jq -n --arg text "$MESSAGE" '{text: $text}')"
           curl -fsSL -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"

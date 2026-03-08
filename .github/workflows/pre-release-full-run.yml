@@ -154,9 +154,9 @@ jobs:
 
           {
             echo "## Pre-release Full Suite Summary"
-            echo "- Status: `${{ job.status }}`"
-            echo "- Gate decision: `${{ steps.gate.outputs.reason }}`"
-            echo "- Markers: `${{ inputs.markers }}`"
+            echo "- Status: ${{ job.status }}"
+            echo "- Gate decision: ${{ steps.gate.outputs.reason }}"
+            echo "- Markers: ${{ inputs.markers }}"
             echo "- Run URL: ${RUN_URL}"
             if [[ -n "$REPORT_URL" ]]; then
               echo "- Allure report: ${REPORT_URL}"
@@ -183,7 +183,7 @@ jobs:
             ICON=":x:"
           fi
 
-          MESSAGE="${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*\nRepo: `${{ github.repository }}`\nRef: `${{ github.ref_name }}`\nEvent: `${{ github.event_name }}`\nGate: `${{ steps.gate.outputs.reason }}`\nMarkers: `${{ inputs.markers }}`\nRun: ${RUN_URL}"
+          MESSAGE="${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*\nRepo: ${{ github.repository }}\nRef: ${{ github.ref_name }}\nEvent: ${{ github.event_name }}\nGate: ${{ steps.gate.outputs.reason }}\nMarkers: ${{ inputs.markers }}\nRun: ${RUN_URL}"
 
           if [[ -n "$REPORT_URL" ]]; then
             MESSAGE="${MESSAGE}\nAllure: ${REPORT_URL}"
