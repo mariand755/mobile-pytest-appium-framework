@@ -10,35 +10,62 @@ on:
       markers:
         description: 'pytest -m expression'
         required: true
-        default: 'smoke and sauce'
+        default: 'smoke and android'
 
 jobs:
   run:
     runs-on: ubuntu-latest
     env:
       RUN_ENV: ci
-      APPIUM_SERVER_URL: ${{ secrets.SAUCE_APPIUM_URL }}
       SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
       SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
       SAUCE_REGION: ${{ secrets.SAUCE_REGION }}
       PLATFORM: ${{ inputs.platform }}
-      ANDROID_SAUCE_APP: ${{ secrets.ANDROID_SAUCE_APP }}
-      IOS_SAUCE_APP: ${{ secrets.IOS_SAUCE_APP }}
+      APPIUM_SERVER_URL: https://ondemand.${{ secrets.SAUCE_REGION }}.saucelabs.com:443/wd/hub
+      ANDROID_SAUCE_APP: storage:filename=Android.SauceLabs.apk
+      IOS_SAUCE_APP: storage:filename=iOS.Simulator.SauceLabs.zip
+      SAUCE_ANDROID_DEVICE: Samsung Galaxy S9 Plus FHD GoogleAPI Emulator
+      SAUCE_ANDROID_PLATFORM_VERSION: "8.1"
+
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify Sauce secrets
+        run: |
+          test -n "${{ secrets.SAUCE_USERNAME }}"
+          test -n "${{ secrets.SAUCE_ACCESS_KEY }}"
+          test -n "${{ secrets.SAUCE_REGION }}"
+
+      - name: Create .env for CI (from GitHub secrets and inputs)
+        run: |
+          printf "%s\n" \
+            "RUN_ENV=ci" \
+            "PLATFORM=${{ inputs.platform }}" \
+            "SAUCE_USERNAME=${{ secrets.SAUCE_USERNAME }}" \
+            "SAUCE_ACCESS_KEY=${{ secrets.SAUCE_ACCESS_KEY }}" \
+            "SAUCE_REGION=${{ secrets.SAUCE_REGION }}" \
+            "APPIUM_SERVER_URL=https://ondemand.${{ secrets.SAUCE_REGION }}.saucelabs.com:443/wd/hub" \
+            "ANDROID_SAUCE_APP=storage:filename=Android.SauceLabs.apk" \
+            "IOS_SAUCE_APP=storage:filename=iOS.Simulator.SauceLabs.zip" \
+            "SAUCE_ANDROID_DEVICE=Samsung Galaxy S9 Plus FHD GoogleAPI Emulator" \
+            "SAUCE_ANDROID_PLATFORM_VERSION=8.1" \
+            > .env
+
+          echo "==== .env keys (redacted) ===="
+          sed -E 's/(SAUCE_ACCESS_KEY=).+/\1***REDACTED***/' .env
       
       - name: Prepare report dirs
         run: |
           mkdir -p reports/allure-results reports/artifacts
 
       - name: Build Docker image
-        run: docker compose -f docker/compose.yml build
+        run: docker compose --env-file .env -f docker/compose.yml build
 
       - name: Run Tests
         run: |
-          docker compose -f docker/compose.yml run --rm tests \
-            pytest -m "${{ inputs.markers }}" -q
+          docker compose --env-file .env -f docker/compose.yml run --rm tests \
+            pytest -m "${{ inputs.markers }}" -q --alluredir=reports/allure-results
 
       - name: Upload Allure Results
         if: always()
@@ -56,3 +83,7 @@ jobs:
           name: failure-artifacts-${{ github.run_id }}
           path: reports/artifacts
           if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --env-file .env -f docker/compose.yml down -v --remove-orphans

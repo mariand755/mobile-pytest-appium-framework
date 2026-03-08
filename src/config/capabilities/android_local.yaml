@@ -1,0 +1,13 @@
+platform_name: Android
+automation_name: UiAutomator2
+device_name: Android Emulator
+udid: host.docker.internal:5555
+app: /apps/android/Android.SauceLabs.apk
+app_package: com.swaglabsmobileapp
+app_activity: .MainActivity
+app_wait_activity: "*"
+app_wait_duration: 60000
+new_command_timeout: 180
+no_reset: false
+full_reset: true
+auto_grant_permissions: true

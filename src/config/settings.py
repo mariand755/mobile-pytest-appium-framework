@@ -13,6 +13,13 @@ RUN_ENV = os.getenv("RUN_ENV", "local").lower()  # local | ci
 PLATFORM = os.getenv("PLATFORM", "android").lower()
 
 # -------------------------
+# Config paths
+# -------------------------
+CONFIG_DIR = os.path.dirname(__file__)
+CAPABILITIES_DIR = os.path.join(CONFIG_DIR, "capabilities")
+ENVIRONMENTS_DIR = os.path.join(CONFIG_DIR, "environments")
+
+# -------------------------
 # Appium
 # -------------------------
 APPIUM_SERVER_URL = os.getenv(
@@ -31,4 +38,9 @@ ANDROID_LOCAL_APP_PATH = os.getenv(
 ANDROID_SAUCE_APP = os.getenv(
     "ANDROID_SAUCE_APP",
     "storage:filename=Android.SauceLabs.apk"
+)
+
+IOS_SAUCE_APP = os.getenv(
+    "IOS_SAUCE_APP",
+    "storage:filename=iOS.Simulator.SauceLabs.zip"
 )

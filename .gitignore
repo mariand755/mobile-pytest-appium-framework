@@ -11,8 +11,14 @@ build/
 venv/
 env/
 
-# Test reports & artifacts
-reports/
+# Test reports & artifacts (keep generated outputs out of git)
+reports/allure-results/
+reports/allure-report/
+reports/artifacts/
+reports/**/*.png
+reports/**/*.xml
+reports/**/*.log
+reports/metrics.json
 
 # Environment variables
 .env
@@ -25,8 +31,12 @@ reports/
 # App binaries
 apps/android/*.apk
 apps/ios/*.ipa
+apps/ios/*.zip
 
 # IDE / OS
 .DS_Store
 .idea/
 .vscode/
+
+# Private docs
+docs/private_docs/*

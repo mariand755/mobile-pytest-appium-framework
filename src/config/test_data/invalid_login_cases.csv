@@ -1,0 +1,3 @@
+case_id,username,password,expected_error_contains
+invalid_user_wrong_password,invalid_user,wrong_password,do not match
+standard_user_wrong_password,standard_user,wrong_password,do not match
