@@ -1,0 +1,155 @@
+name: PR Check - Mobile Quality Gate
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-mobile-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Temporary safety switch while Sauce credentials are expired.
+  # Set to "true" after credentials are rotated and validated.
+  ENABLE_PR_MOBILE_GATE: "false"
+
+jobs:
+  android-gate:
+    name: Android PR Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Decide PR mobile gate execution
+        id: gate
+        env:
+          SAUCE_USERNAME: ${{ secrets.SAUCE_USERNAME }}
+          SAUCE_ACCESS_KEY: ${{ secrets.SAUCE_ACCESS_KEY }}
+          SAUCE_REGION: ${{ secrets.SAUCE_REGION }}
+        run: |
+          if [[ "${{ env.ENABLE_PR_MOBILE_GATE }}" != "true" ]]; then
+            echo "run_gate=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Skipped: set ENABLE_PR_MOBILE_GATE=true in this workflow to re-enable PR mobile gate execution." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ -z "$SAUCE_USERNAME" || -z "$SAUCE_ACCESS_KEY" || -z "$SAUCE_REGION" ]]; then
+            echo "run_gate=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Skipped: one or more Sauce secrets are missing." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "run_gate=true" >> "$GITHUB_OUTPUT"
+          echo "reason=Enabled: PR mobile gate will run." >> "$GITHUB_OUTPUT"
+
+      - name: Gate status
+        run: echo "${{ steps.gate.outputs.reason }}"
+
+      - name: Create .env for CI (from GitHub secrets)
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
+        run: |
+          printf "%s\n" \
+            "RUN_ENV=ci" \
+            "PLATFORM=android" \
+            "SAUCE_USERNAME=${{ secrets.SAUCE_USERNAME }}" \
+            "SAUCE_ACCESS_KEY=${{ secrets.SAUCE_ACCESS_KEY }}" \
+            "SAUCE_REGION=${{ secrets.SAUCE_REGION }}" \
+            "APPIUM_SERVER_URL=https://${{ secrets.SAUCE_USERNAME }}:${{ secrets.SAUCE_ACCESS_KEY }}@ondemand.${{ secrets.SAUCE_REGION }}.saucelabs.com:443/wd/hub" \
+            "ANDROID_SAUCE_APP=storage:filename=Android.SauceLabs.apk" \
+            "SAUCE_ANDROID_DEVICE=Samsung Galaxy S9 Plus FHD GoogleAPI Emulator" \
+            "SAUCE_ANDROID_PLATFORM_VERSION=8.1" \
+            > .env
+
+          echo "==== .env keys (redacted) ===="
+          sed -E 's/(SAUCE_ACCESS_KEY=).+/\1***REDACTED***/' .env
+
+      - name: Prepare report dirs
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
+        run: |
+          rm -rf reports/allure-results reports/artifacts reports/allure-report
+          mkdir -p reports/allure-results reports/artifacts
+
+      - name: Set up Docker Buildx
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build images
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
+        run: docker compose --env-file .env -f docker/compose.yml build
+
+      - name: Run Android PR gate checks on Sauce (suite retry only)
+        if: ${{ steps.gate.outputs.run_gate == 'true' }}
+        run: |
+          bash scripts/ci_retry_pytest.sh \
+            --compose-file docker/compose.yml \
+            --env-file .env \
+            --markers "smoke and android and not quarantine" \
+            --allure-dir reports/allure-results \
+            --max-retries 1 \
+            --retry-delay-seconds 12
+
+      - name: Upload Allure Results
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ github.run_id }}
+          path: reports/allure-results
+          if-no-files-found: ignore
+
+      - name: Upload Failure Artifacts (screenshots + xml)
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-artifacts-${{ github.run_id }}
+          path: reports/artifacts
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: ${{ always() && steps.gate.outputs.run_gate == 'true' }}
+        run: docker compose --env-file .env -f docker/compose.yml down -v --remove-orphans
+
+      - name: Write workflow summary
+        if: ${{ always() }}
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          {
+            echo "## PR Mobile Gate Summary"
+            echo "- Status: ${{ job.status }}"
+            echo "- Gate decision: ${{ steps.gate.outputs.reason }}"
+            echo "- Markers: smoke and android and not quarantine"
+            echo "- Run URL: ${RUN_URL}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack
+        if: ${{ always() && (github.event_name != 'pull_request' || job.status != 'success') }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [[ -z "$SLACK_WEBHOOK_URL" ]]; then
+            echo "SLACK_WEBHOOK_URL is not configured; skipping Slack notification."
+            exit 0
+          fi
+
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          ICON=":white_check_mark:"
+          if [[ "$JOB_STATUS" != "success" ]]; then
+            ICON=":x:"
+          fi
+
+          MESSAGE="$(printf '%s\n' \
+            "${ICON} *${{ github.workflow }}* finished with *${JOB_STATUS}*" \
+            "Repository: ${{ github.repository }}" \
+            "Ref: ${{ github.ref_name }}" \
+            "Event: ${{ github.event_name }}" \
+            "Gate: ${{ steps.gate.outputs.reason }}" \
+            "Markers: smoke and android and not quarantine" \
+            "Run: ${RUN_URL}")"
+
+          PAYLOAD="$(jq -n --arg text "$MESSAGE" '{text: $text}')"
+          curl -fsSL -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"

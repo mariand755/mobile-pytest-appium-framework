@@ -6,7 +6,41 @@ def get_env(name: str, default: str | None = None) -> str:
         raise RuntimeError(f"Missing required env var: {name}")
     return val
 
-APPIUM_SERVER_URL = get_env("APPIUM_SERVER_URL", "http://localhost:4723/wd/hub")
-PLATFORM = get_env("PLATFORM", "android").lower()
+# -------------------------
+# Execution context
+# -------------------------
+RUN_ENV = os.getenv("RUN_ENV", "local").lower()  # local | ci
+PLATFORM = os.getenv("PLATFORM", "android").lower()
 
-ANDROID_APP_PATH = os.getenv("ANDROID_APP_PATH", "")  # local run
+# -------------------------
+# Config paths
+# -------------------------
+CONFIG_DIR = os.path.dirname(__file__)
+CAPABILITIES_DIR = os.path.join(CONFIG_DIR, "capabilities")
+ENVIRONMENTS_DIR = os.path.join(CONFIG_DIR, "environments")
+
+# -------------------------
+# Appium
+# -------------------------
+APPIUM_SERVER_URL = os.getenv(
+    "APPIUM_SERVER_URL",
+    "http://appium:4723/wd/hub"
+)
+
+# -------------------------
+# Android app sources
+# -------------------------
+ANDROID_LOCAL_APP_PATH = os.getenv(
+    "ANDROID_LOCAL_APP_PATH",
+    "/apps/android/Android.SauceLabs.apk"
+)
+
+ANDROID_SAUCE_APP = os.getenv(
+    "ANDROID_SAUCE_APP",
+    "storage:filename=Android.SauceLabs.apk"
+)
+
+IOS_SAUCE_APP = os.getenv(
+    "IOS_SAUCE_APP",
+    "storage:filename=iOS.Simulator.SauceLabs.zip"
+)

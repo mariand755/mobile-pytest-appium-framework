@@ -6,7 +6,7 @@ class LoginPage:
     def __init__(self, driver):
         self.driver = driver
 
-    def wait_until_loaded(self, timeout: int = 10):
+    def wait_until_loaded(self, timeout: int = 20):
         wait_for(self.driver, LoginLocators.LOGIN_BTN, timeout=timeout)
         return self
 

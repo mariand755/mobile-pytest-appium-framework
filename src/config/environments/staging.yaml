@@ -1,0 +1,5 @@
+name: staging
+run_env: ci
+platform: android
+appium_server_url: https://ondemand.us-west-1.saucelabs.com:443/wd/hub
+notes: Sauce Labs cloud execution for CI validation.

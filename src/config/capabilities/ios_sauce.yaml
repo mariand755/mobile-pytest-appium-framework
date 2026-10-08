@@ -1,0 +1,12 @@
+platform_name: iOS
+automation_name: XCUITest
+device_name: iPhone 14 Simulator
+platform_version: "16.4"
+app: storage:filename=iOS.Simulator.SauceLabs.zip
+new_command_timeout: 180
+no_reset: false
+full_reset: true
+auto_accept_alerts: true
+sauce_options:
+  name: iOS - Smoke
+  build: local
