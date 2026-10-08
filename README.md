@@ -233,3 +233,11 @@ Workflows are located in `.github/workflows/`:
 - **Allure reporting** is ready to wire (results directory lives under `reports/`)
 - CI uses a hybrid reliability strategy: suite-level bounded retry for transient infra and bounded per-test reruns for selected workflows
 - Default CI marker expressions exclude `quarantine`; run quarantined tests only through explicit marker input
+
+---
+
+## 📄 License
+
+Copyright (C) 2026 mariandadzie
+
+Licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
