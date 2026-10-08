@@ -238,6 +238,6 @@ Workflows are located in `.github/workflows/`:
 
 ## 📄 License
 
-Copyright (C) 2026 mariandadzie
+Copyright (C) 2026 Marian Dadzie
 
 Licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
